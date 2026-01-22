@@ -1,2 +1,2 @@
 Boring_theory:) : https://www.chipverify.com/tutorials/verilog
-too_much_project : https://www.fpga4student.com/
+too_many_projects : https://www.fpga4student.com/
