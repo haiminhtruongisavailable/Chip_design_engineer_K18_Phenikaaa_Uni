@@ -1,10 +1,9 @@
 # Technical Report: 8-bit Counter Digital Chip Design (RTL to GDSII)
 
-**Author:** [Your Name]  
+**Author:** Hai Minh Truong  
 **Date:** May 2026  
 **Project:** Digital Chip Design Tutorial – 8-bit Counter  
 **Tools:** OpenLane 2 + Sky130 PDK (130nm)  
-**Institution:** [Your University / Self-study]
 
 ---
 
@@ -98,95 +97,86 @@ The design follows the standard OpenLane 2 automated flow, which internally exec
 
 This section provides in-depth explanations of each stage in the design flow.
 
-### 5.1 Environment Setup and Challenges
+### 5.1 Environment Setup
 
-The environment setup was the most difficult and time-consuming part of the project.
+      ─ bash
+      # Create virtual environment
+      # Create virtual environment
+      source ~/openlane-env/bin/activate
+      # Install OpenLane with minimal dependencies
+      pip install openlane --no-deps
+      pip install cloup deprecated ioplace-parser lxml psutil rapidfuzz semver yamlcore httpx rich volare
 
-#### 5.1.1 Python Installation Failures (Initial Attempts)
+      # Enable Sky130 PDK
+      volare enable --pdk sky130 0fe599b2afb6708d281543108caf8310912f54af
+      # Pull OpenLane Docker image
+      docker pull ghcr.io/efabless/openlane2:2.3.10
+      docker pull ghcr.io/efabless/openlane2:2.3.10
 
-The first attempts to install OpenLane using `pip install openlane` consistently failed with the following error:
 
-```
-ERROR: Failed to build installable wheels for some pyproject.toml based projects
-╰─> klayout, libparse
-```
+      ─ bash
+      alias ol='docker run --rm -it \
+        -v $(pwd):/work \
+        -w /work \
+        -v ~/.volare:/root/.volare \
+        -v ~/.volare:/root/.volare \
+        openlane'
 
-Multiple strategies were tried, including:
-- Creating new virtual environments
-- Using `--no-deps` flag
-- Installing system dependencies (build-essential, Qt libraries, etc.)
-- Installing KLayout via `apt`
+    Explanation: Due to repeated build failures when installing OpenLane via pip (mainly caused by klayout and    libparse), the Docker-based approach was adopted. This method proved to be stable and reliable.
 
-None of these fully resolved the native build issues.
-
-#### 5.1.2 Root Cause Analysis
-
-OpenLane depends on several heavy native packages that require C++ compilation and GUI libraries. These packages frequently fail to build from source on WSL, especially when the WSL distribution is stored on a secondary drive (D: drive in this case).
-
-#### 5.1.3 Successful Working Method (Docker + Volare)
-
-After many failed attempts, the following working setup was established:
-
-```bash
-# Create virtual environment
-python3 -m venv ~/openlane-env
-source ~/openlane-env/bin/activate
-
-# Install OpenLane with minimal dependencies
-pip install openlane --no-deps
-pip install cloup deprecated ioplace-parser lxml psutil rapidfuzz semver yamlcore httpx rich volare
-
-# Enable Sky130 PDK
-volare enable --pdk sky130 0fe599b2afb6708d281543108caf8310912f54af
-
-# Pull OpenLane Docker image
-docker pull ghcr.io/efabless/openlane2:2.3.10
-```
-
-A convenient alias was also created:
-
-```bash
-alias ol='docker run --rm -it \
-  -v $(pwd):/work \
-  -w /work \
-  -v ~/.volare:/root/.volare \
-  ghcr.io/efabless/openlane2:2.3.10 \
-  openlane'
-```
-
-This Docker-based approach proved to be stable and reliable.
-
----
-
-### 5.2 RTL Design and Simulation
-
-The 8-bit counter was designed and verified using SystemVerilog and Icarus Verilog.
-
----
+      ─ bash
+      iverilog -g2012 -o counter_sim counter.sv tb_counter.sv
+      vvp counter_sim
+      # View waveform
+      # View waveform
 
 ### 5.3 Linting
 
-Linting was performed using Verilator. The design passed with no major warnings.
-
----
+      ─ bash
+      verilator --lint-only -Wall counter.sv
 
 ### 5.4 Synthesis
 
-Synthesis was performed using Yosys. The design was successfully converted into a gate-level netlist containing 24 cells.
+      ─ bash
+      yosys
 
----
+    Inside Yosys:
+
+    Inside Yosys:
+      read_verilog -sv counter.sv
+      hierarchy -check -top counter
+      proc
+      opt
+      opt
+      memory
+      techmap
+      opt
+      write_verilog -noattr counter_netlist.v
+      stat
+      exit
 
 ### 5.5 Gate-Level Simulation
 
-Gate-level simulation was performed using the synthesized netlist and Icarus Verilog. The design maintained correct functionality after synthesis.
-
----
+─ bash
+iverilog -g2012 -o gl_sim tb_counter.sv counter_netlist.v \
+  /usr/share/pdk/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v \
+  /usr/share/pdk/sky130_fd_sc_hd/verilog/primitives.v
+vvp gl_sim
 
 ### 5.6 OpenLane Configuration
 
-A `config.json` file was created for the OpenLane flow.
-
----
+─ bash
+# Create config.json
+cat > config.json << 'EOF'
+{
+    "DESIGN_NAME": "counter",
+    "VERILOG_FILES": ["dir::counter.sv"],
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 10.0,
+    "FP_CORE_UTIL": 50,
+    "PL_TARGET_DENSITY_PCT": 60
+}
+EOF
 
 ### 5.7 – 5.16 OpenLane Physical Design Flow
 
